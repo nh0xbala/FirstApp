@@ -1,0 +1,149 @@
+<html>
+<head>
+
+<script type="text/javascript" charset="utf-8" src="js/map.js"></script>
+<script type="text/javascript" charset="utf=8" src="js/car.js"></script>
+<script type="text/javascript" charset="utf=8" src="js/rock.js"></script>
+<script src="phonegap.js"></script>s
+<script type="text/javascript">
+var Keys = {
+      LEFT_ARROW: 37,
+      UP_ARROW: 38,
+      RIGHT_ARROW: 39,
+      DOWN_ARROW: 40
+    };
+var CHECKPOINT_SIZE = 40;
+var ROAD_FRICTION = 0.05;
+var GRASS_FRICTION = 0.07;
+var FPS = 30;
+var AVAILABLE_KEYS =
+	[ 	Keys.UP_ARROW,
+		Keys.DOWN_ARROW,
+		Keys.LEFT_ARROW,
+		Keys.RIGHT_ARROW
+	];
+
+var _canvas;
+var _context;
+var _car;
+var _keyStates = [];
+var _map;
+var _maskImg = new Image();
+var _timer;
+function clear() {
+	_canvas.width = _canvas.width
+}
+function init() {
+
+	_canvas = document.getElementById("canvas");	
+	
+	_context = _canvas.getContext("2d");	
+	_context.font = "24px Arial";
+	_canvas.onkeydown = canvas_keyDown;
+	_canvas.onkeyup = canvas_keyUp;	
+	_car = new Car(_canvas.width,_canvas.height);		
+	_maskImg.src = "image/map1-mask.png";
+	
+	_map = new Map(_context,_canvas,newgame);
+	
+}
+function newgame(){
+	clearInterval(_timer);
+	delete _timer;
+	_keyStates = [];
+	_map.reset();
+	_car.friction = ROAD_FRICTION;	
+	_car.reset(_canvas.width-20,250,_canvas.width);
+	_map.showStartScreen(_context,_canvas,
+		// on completed
+		function(){
+			_timer = window.setInterval(update,1000/FPS);			
+		}
+	);
+}
+function draw(){
+
+	clear();
+	
+	_map.draw(_context);
+	
+	_car.draw(_context);
+	_context.drawImage(_maskImg,0,0,_canvas.width,_canvas.height);	
+}
+
+function update(){
+	_car.handleInput(_keyStates);	
+	_car.update();
+	
+	// check collisions
+	var friction = ROAD_FRICTION;
+	_car.canGoForward = true;
+	_car.canGoBack = true;
+	_car.canTurnLeft = true;
+	_car.canTurnRight = true;
+	
+	for(var i=0;i<_car.vertices.length;i++)
+	{
+		var p = _car.vertices[i];
+		
+		var index = Math.floor((p.x+p.y*_map.imageData.width)*4+3);
+		
+		if(_map.imageData.data[index]!=0)
+		{
+			// increase the friction by 0.05 for each vertex (or wheel) collide with grass
+			friction += GRASS_FRICTION;
+		}	
+		// check collisions rocks
+		for(var j=0;j<_map.rocks.length;j++)
+		{
+			if(_map.rocks[j].contains(p.x,p.y)){
+				if(i==0 || i==3)
+					_car.canGoBack = false;
+				else
+					_car.canGoForward = false;
+					
+				if(i==0 || i==1)
+					_car.canTurnLeft = false;
+				else
+					_car.canTurnRight = false;	
+			}
+		}	
+	}
+
+	_car.friction = friction;
+	// check if player finish a lap
+	if(_map.reachNextCheckPoint(_car.cx,_car.cy) && _map.currentCheckPoint==0)
+	{
+		_map.currentLap++;
+		if(_map.currentLap==5)
+		{
+			alert("Congratulation! You have finished the race in "+_map.getTotalTime()+".");
+			
+			newgame(true);				
+		}
+	}	
+	draw();
+}
+
+function canvas_keyDown(e){
+	if(AVAILABLE_KEYS.indexOf(e.keyCode)!=-1)	
+	{
+		_keyStates[e.keyCode] = true;	
+	}
+}
+function canvas_keyUp(e){
+	if(_keyStates[e.keyCode])	
+		_keyStates[e.keyCode] = false;	
+}
+
+window.onload = function(){
+	init();	
+}
+</script>
+</head>
+
+<body>
+<canvas id="canvas" width="500" height="400"
+	tabindex="1" style="border: 1px solid" ></canvas>
+</body>
+</html>
